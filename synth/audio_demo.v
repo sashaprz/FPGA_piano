@@ -60,12 +60,12 @@ wire				read_audio_in;
 wire				audio_out_allowed;
 wire		[31:0]	left_channel_audio_out;
 wire		[31:0]	right_channel_audio_out;
-reg					write_audio_out;	// TODO: change to wire (why? who drives it now?)
+wire 				write_audio_out;	//change to wire bc driven not in alwyas block
 
 wire				reset;
 
-// TODO: declare a 16-bit wire for the sample coming out of sound_engine
-
+//declare a 16-bit wire for the sample coming out of sound_engine
+wire [15:0] sample;
 
 /*****************************************************************************
  *                             Combinational Logic                           *
@@ -73,23 +73,19 @@ wire				reset;
 
 assign reset = ~KEY[0];
 
-// TODO: tie read_audio_in to 0 (we never read the mic side)
-
-// TODO: left_channel_audio_out  = the 16-bit sample placed in the top 16 bits
-// TODO: right_channel_audio_out = same thing (mono: both channels identical)
-
+//we never read the mic side
+assign read_audio_in = 1'b0;
+//left_channel_audio_out  = the 16-bit sample placed in the top 16 bits
+assign left_channel_audio_out = [15:0] {sample, 16'b0}; //need 32 bits to match what controller expects
+//right_channel_audio_out = same thing (mono: both channels identical)
+assign right_channel_audio_out = [15:0] {sample, 16'b0}; 
 
 /*****************************************************************************
  *                              Internal Modules                             *
  *****************************************************************************/
 
-// TODO: instantiate sound_engine here
-//   clk     <- CLOCK_50
-//   reset   <- reset
-//   oct     <- SW[1:0]
-//   allowed <- audio_out_allowed
-//   go      -> write_audio_out
-//   sample  -> your sample wire
+//instantiate sound_engine here
+sound_engine engine(.clk(CLOCK_50), .reset(reset), .oct(SW[1:0]), .allowed(audio_out_allowed), .go(write_audio_out), .sample(sample));
 
 Audio_Controller Audio_Controller (
 	// Inputs
