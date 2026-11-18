@@ -50,7 +50,7 @@ module tb_sound_engine;
         #15000;
         oct = 2'b10;                      // octave down
         #60000;
-        $finish;                         // ends sim (Icarus); use $stop in ModelSim
+        $stop                         // ends sim (Icarus); use $stop in ModelSim
     end
 
 endmodule
