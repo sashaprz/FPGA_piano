@@ -46,12 +46,10 @@ module tb_sound_engine;
                 // 2 cycles is 30000. run long enough for 2+ sine cycles
                 //to make sure the wrap around works -> for the counter. 
                 //to measure the period -> need to see the same point twice
-        oct = 2'b01;  //-> oct[1] = 0, oct[0] = 1 which matches saying that oct[1] = 1 means shifts down. 
-                        //so oct[1] = 0 means shift up
-                        // octave up
-        #20;
+        oct = 2'b01;  // 2'b01: oct[1]=0 so the down branch is skipped; oct[0]=1 so step doubles → octave up
+        #15000;
         oct = 2'b10;                      // octave down
-        #20;
+        #60000;
         $finish;                         // ends sim (Icarus); use $stop in ModelSim
     end
 
