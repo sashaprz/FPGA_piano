@@ -1,3 +1,4 @@
+`include "sine_rom.v"
 
 module sound_engine (input clk, input reset, input [1:0] oct, input allowed, output go, output [15:0] sample); 
 

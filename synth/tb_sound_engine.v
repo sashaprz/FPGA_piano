@@ -1,5 +1,22 @@
 `timescale 1ns / 1ns
 
+//how to run inside modelsim: 
+/*
+paste in the terminal
+vlib work
+vlog sine_rom.v sound_engine.v tb_sound_engine.v
+vsim tb_sound_engine
+add wave sim:/tb_sound_engine/dut/*
+run -all
+*/
+
+/*
+wave settings for modelsim
+sample: right-click → Radix → Decimal, then right-click → Format → Analog (automatic). That’s your sine curve.
+phase: right-click → Radix → Unsigned.
+*/
+
+
 module tb_sound_engine;
 
     //test bench, makes a fake clock fake reset etc to test
