@@ -76,9 +76,9 @@ assign reset = ~KEY[0];
 //we never read the mic side
 assign read_audio_in = 1'b0;
 //left_channel_audio_out  = the 16-bit sample placed in the top 16 bits
-assign left_channel_audio_out = [15:0] {sample, 16'b0}; //need 32 bits to match what controller expects
+assign left_channel_audio_out = {sample, 16'b0}; //need 32 bits to match what controller expects
 //right_channel_audio_out = same thing (mono: both channels identical)
-assign right_channel_audio_out = [15:0] {sample, 16'b0}; 
+assign right_channel_audio_out = {sample, 16'b0}; 
 
 /*****************************************************************************
  *                              Internal Modules                             *

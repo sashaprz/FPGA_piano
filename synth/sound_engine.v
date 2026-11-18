@@ -16,12 +16,15 @@ module sound_engine (input clk, input reset, input [1:0] oct, input allowed, out
     //octve mux
     always @(*) begin
         //if both are up, oct[1] wins so octave goes down
+
         if (oct[1]) 
             //oct[1] = down
-            step = BASE_STEP >> 1; 
+            step = BASE_STEP >> 1; //this is halving the basestep
+            //you step through the table at half the speed, half the frequency, an octave is a factor of 2 in frequency
         else if (oct[0])
             //oct[0] = up one octave
-            step = BASE_STEP << 1;
+            step = BASE_STEP << 1; //doubling frequency is one octave up
+            //means shift every bit left. this is like multiplying by 2
         else    
             step = BASE_STEP; //need this to prevent quartus from assuming this is a latch
     end
