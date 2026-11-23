@@ -10,8 +10,10 @@ module sound_engine (input clk, input reset, input [1:0] oct, input allowed, out
     /*
     261.63 laps/s ÷ 48,828 moves/s = 0.005358 laps per move
     0.005358 × 16,777,216 units/lap = 89,895 units per move
+
+    48 kHz: 261.63 × 2²⁴ / 48000 = 91,446
     */
-    localparam [23:0] BASE_STEP = 24'd89895; //the d means decimal value
+    localparam [23:0] BASE_STEP = 24'd91446; //the d means decimal value
     reg [23:0] step; //assigned in an always block
 
     //octve mux
