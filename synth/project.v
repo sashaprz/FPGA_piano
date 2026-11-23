@@ -1,9 +1,23 @@
-module project(CLOCK_50, KEY, PS2_CLK, PS2_DAT, HEX0, HEX1, heldkeys);
+module project(CLOCK_50, KEY, PS2_CLK, PS2_DAT, HEX0, HEX1, heldkeys, VGA_R, VGA_G, VGA_B,
+                VGA_HS, VGA_VS, VGA_BLANK_N, VGA_SYNC_N, VGA_CLK);
     input CLOCK_50;
     input [3:0] KEY;
     inout PS2_CLK, PS2_DAT;
     output [6:0] HEX0, HEX1;
     output [11:0] heldkeys;
+
+    parameter RESOLUTION = "640x480"; // "640x480" "320x240" "160x120"
+    parameter COLOR_DEPTH = 9; // 9 6 3
+    parameter nX = (RESOLUTION == "640x480") ? 10 : ((RESOLUTION == "320x240") ? 9 : 8);
+    parameter nY = (RESOLUTION == "640x480") ? 9 : ((RESOLUTION == "320x240") ? 8 : 7);
+    output [7:0] VGA_R;
+    output [7:0] VGA_G;
+    output [7:0] VGA_B;
+    output VGA_HS;
+    output VGA_VS;
+    output VGA_BLANK_N;
+    output VGA_SYNC_N;
+    output VGA_CLK; 
 
     wire resetn = KEY[0];
     wire PS2_CLK_S, PS2_DAT_S; // signals synced to our clock
