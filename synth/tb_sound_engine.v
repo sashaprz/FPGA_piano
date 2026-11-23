@@ -60,7 +60,7 @@ module tb_sound_engine;
         reset = 1; oct = 2'b00; held_key = 12'b0;        // start in reset, middle octave
         repeat(3) @(posedge clk);
         reset = 0;                    // release reset
-                held_key = 12'b0000_0000_0000;   // nothing held -> expect sample = 0
+        held_key = 12'b0000_0000_0000;   // nothing held -> expect sample = 0
         #2000;
         held_key = 12'b0010_0000_0000;   // A (bit 9) -> expect ~109 samples/period
         #20000;
