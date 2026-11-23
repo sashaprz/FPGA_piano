@@ -19,6 +19,9 @@ module audio_demo (
 
 	FPGA_I2C_SDAT,
 
+	PS2_CLK, 
+	PS2_DAT,
+
 	// Outputs
 	AUD_XCK,
 	AUD_DACDAT,
@@ -41,6 +44,8 @@ input				AUD_ADCDAT;
 inout				AUD_BCLK;
 inout				AUD_ADCLRCK;
 inout				AUD_DACLRCK;
+inout 				PS2_CLK;
+inout 				PS2_DAT;
 
 inout				FPGA_I2C_SDAT;
 
@@ -49,6 +54,8 @@ output				AUD_XCK;
 output				AUD_DACDAT;
 
 output				FPGA_I2C_SCLK;
+output 				[6:0] HEX0;
+output 				[6:0] HEX1;
 
 /*****************************************************************************
  *                 Internal Wires and Registers Declarations                 *
@@ -66,6 +73,7 @@ wire				reset;
 
 //declare a 16-bit wire for the sample coming out of sound_engine
 wire [15:0] sample;
+wire [11:0] heldkeys; //12 bit wire
 
 /*****************************************************************************
  *                             Combinational Logic                           *
@@ -85,7 +93,8 @@ assign right_channel_audio_out = {sample, 16'b0};
  *****************************************************************************/
 
 //instantiate sound_engine here
-sound_engine engine(.clk(CLOCK_50), .reset(reset), .oct(SW[1:0]), .allowed(audio_out_allowed), .go(write_audio_out), .sample(sample));
+sound_engine engine(.clk(CLOCK_50), .reset(reset), .oct(SW[1:0]), .held_key(heldkeys), .allowed(audio_out_allowed), .go(write_audio_out), .sample(sample));
+project joanne(.CLOCK_50(CLOCK_50), .KEY(KEY), .PS2_CLK(PS2_CLK), .PS2_DAT(PS2_DAT), .HEX0(HEX0), .HEX1(HEX1), .heldkeys(heldkeys));
 
 Audio_Controller Audio_Controller (
 	// Inputs

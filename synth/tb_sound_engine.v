@@ -4,7 +4,7 @@
 /*
 paste in the terminal
 vlib work
-vlog sine_rom.v sound_engine.v tb_sound_engine.v
+vlog sine_rom.v sound_engine.v tb_sound_engine.v note_lut.v priority_encoder.v
 vsim tb_sound_engine
 add wave sim:/tb_sound_engine/dut/*
 run -all
@@ -28,10 +28,11 @@ module tb_sound_engine;
     reg [1:0] oct;
     wire go;
     wire[15:0] sample;
+    reg [11:0] held_key;
 
     // ---- DUT instance: connect every sound_engine port ----
     //instantiating the module + plugging the fakes in 
-    sound_engine dut (.clk(clk), .reset(reset), .oct(oct), .allowed(allowed), .go(go), .sample(sample));
+    sound_engine dut (.clk(clk), .reset(reset), .oct(oct), .allowed(allowed), .go(go), .sample(sample), .held_key(held_key));
 
     // clock: 50 MHz ----
     initial clk = 0;
@@ -56,18 +57,18 @@ module tb_sound_engine;
     // ---- stimulus: the test itself ----
     initial begin
         //on the real board, oct is wired to SW so we are simulating a switch flip
-        reset = 1; oct = 2'b00;        // start in reset, middle octave
+        reset = 1; oct = 2'b00; held_key = 12'b0;        // start in reset, middle octave
         repeat(3) @(posedge clk);
         reset = 0;                    // release reset
-        #30000;  // -> 20 is one clock cycle, 4cycles*20 = 80ns/sample. one sine cycle = 187 samples * 80ns = 15000ns                         
-                // 2 cycles is 30000. run long enough for 2+ sine cycles
-                //to make sure the wrap around works -> for the counter. 
-                //to measure the period -> need to see the same point twice
-        oct = 2'b01;  // 2'b01: oct[1]=0 so the down branch is skipped; oct[0]=1 so step doubles → octave up
-        #15000;
-        oct = 2'b10;                      // octave down
-        #60000;
-        $stop                         // ends sim (Icarus); use $stop in ModelSim
+                held_key = 12'b0000_0000_0000;   // nothing held -> expect sample = 0
+        #2000;
+        held_key = 12'b0010_0000_0000;   // A (bit 9) -> expect ~109 samples/period
+        #20000;
+        held_key = 12'b0000_0001_0001;   // C + E (bits 0, 4) -> lowest wins, expect C, ~183 samples/period
+        #30000;
+        held_key = 12'b0000_0000_0000;   // release all -> expect sample = 0
+        #2000;
+        $stop;                        // ends sim (Icarus); use $stop in ModelSim
     end
 
 endmodule
