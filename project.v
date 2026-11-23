@@ -1,4 +1,19 @@
-module project(CLOCK_50, KEY, PS2_CLK, PS2_DAT, HEX0, HEX1);
+module project(CLOCK_50, KEY, PS2_CLK, PS2_DAT, HEX0, HEX1, VGA_R, VGA_G, VGA_B,
+                VGA_HS, VGA_VS, VGA_BLANK_N, VGA_SYNC_N, VGA_CLK);
+
+    parameter RESOLUTION = "640x480"; // "640x480" "320x240" "160x120"
+    parameter COLOR_DEPTH = 9; // 9 6 3
+    parameter nX = (RESOLUTION == "640x480") ? 10 : ((RESOLUTION == "320x240") ? 9 : 8);
+    parameter nY = (RESOLUTION == "640x480") ? 9 : ((RESOLUTION == "320x240") ? 8 : 7);
+    output [7:0] VGA_R;
+    output [7:0] VGA_G;
+    output [7:0] VGA_B;
+    output VGA_HS;
+    output VGA_VS;
+    output VGA_BLANK_N;
+    output VGA_SYNC_N;
+    output VGA_CLK; 
+    
     input CLOCK_50;
     input [3:0] KEY;
     inout PS2_CLK, PS2_DAT;
@@ -46,7 +61,7 @@ module project(CLOCK_50, KEY, PS2_CLK, PS2_DAT, HEX0, HEX1);
     keyslist k0(ps2_byte, key, validkey);
     keyboard_reader k1(CLOCK_50, resetn, ps2_byte, ps2_valid, heldkeys, key, validkey);
 
-    seg7 s0(heldkeys, HEX0, HEX1); // TESTING
+    seg7 s0(heldkeys, HEX0, HEX1, validkey); // TESTING
 endmodule
 
 module sync(D, resetn, clock, Q);
@@ -95,6 +110,7 @@ endmodule
 
 module keyboard_reader (clock, resetn, ps2_byte, ps2_valid, held_keys, keys, valid);
     input clock, resetn, valid;
+    input ps2_valid;
     input [3:0] keys;
     input [7:0] ps2_byte;
     output reg [11:0] held_keys;
@@ -107,9 +123,11 @@ module keyboard_reader (clock, resetn, ps2_byte, ps2_valid, held_keys, keys, val
         end else if (ps2_valid) begin   
             if(f0) begin // previously held key, now released
                 if(valid)
+                begin
                     held_keys[keys] <= 1'b0; // release the key
                     f0 <= 1'b0; // set f0
                 end
+            end
             else if(ps2_byte == 8'hF0)
                 f0 <= 1'b1; // warning that next byte will be a release
             else if(valid) // if pressed key is valid
@@ -118,21 +136,32 @@ module keyboard_reader (clock, resetn, ps2_byte, ps2_valid, held_keys, keys, val
         end
 endmodule
 
-module seg7(D, HEX0, HEX1);
+module seg7(D, HEX0, HEX1, valid);
     input [11:0] D;
-    output [6:0] HEX0, HEX1;
+    input valid;
+    output reg [6:0] HEX0, HEX1;
+    wire flat = D[1] | D[3] | D[6] | D[8] | D[10];
 
-    assign HEX0[2] = D[1] | D[3] | D[6] | D[8] | D[10];
-    assign HEX0[3] = D[1] | D[3] | D[6] | D[8] | D[10];
-    assign HEX0[4] = D[1] | D[3] | D[6] | D[8] | D[10];
-    assign HEX0[5] = D[1] | D[3] | D[6] | D[8] | D[10];
-    assign HEX0[6] = D[1] | D[3] | D[6] | D[8] | D[10];
+    always @ (*) begin
+        if(~validkey || D == 12'd0) begin
+            HEX0 = 7'b1111111;
+            HEX1 = 7'b1111111;
+        end else begin
+            HEX0[0] = 1'b1;
+            HEX0[1] = 1'b1;
+            HEX0[2] = ~flat;
+            HEX0[3] = ~flat;
+            HEX0[4] = ~flat;
+            HEX0[5] = ~flat;
+            HEX0[6] = ~flat;
 
-    assign HEX1[0] = 1'b1;
-    assign HEX1[1] = D[1] | D[2] | D[8] | D[9] | D[10] | D[11];
-    assign HEX1[2] = D[1] | D[2] | D[6] | D[7] | D[8] | D[9] | D[10] | D[11];
-    assign HEX1[3] = !(D[5] & D[8] & D[9]);
-    assign HEX1[4] = 1'b1;
-    assign HEX1[5] = 1'b1;
-    assign HEX1[6] = D[3] | D[4] | D[5] | D[8] | D[9] | D[10] | D[11];
+            HEX1[0] = ~(D[0] | D[3] | D[4] | D[5] | D[6] | D[7] | D[8] | D[9]);                    
+            HEX1[1] = ~(D[1] | D[2] | D[8] | D[9]);                                                   
+            HEX1[2] = ~(D[1] | D[2] | D[6] | D[7] | D[8] | D[9] | D[10] | D[11]);                 
+            HEX1[3] = ~(D[0] | D[1] | D[2] | D[3] | D[4] | D[6] | D[7] | D[10] | D[11]);            
+            HEX1[4] = 1'b1;                                                                          
+            HEX1[5] = ~(D[0] | D[3] | D[4] | D[5] | D[6] | D[7] | D[8] | D[9] | D[10] | D[11]);       
+            HEX1[6] = ~(D[1] | D[2] | D[3] | D[4] | D[5] | D[8] | D[9] | D[10] | D[11]);    
+        end
+    end          
 endmodule
