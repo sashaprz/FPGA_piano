@@ -1,6 +1,6 @@
 
 
-module sound_engine (input clk, input reset, input [1:0] oct, input allowed, input [11:0] held_key, output go, output [15:0] sample); 
+module sound_engine (input clk, input reset, input [1:0] oct, input allowed, input [11:0] held_key, input [1:0] wave_sel, output go, output [15:0] sample); 
     /*
     step per key comes from note_lut: step = f × 2²⁴ / 48000.
     */
@@ -9,6 +9,10 @@ module sound_engine (input clk, input reset, input [1:0] oct, input allowed, inp
     wire held; // for gate
     wire [23:0] key_step; 
     wire [15:0] rom_out;
+    wire [15:0] saw; 
+    wire [15:0] square;
+    reg [15:0] wave_out;
+    reg [23:0] phase;
 
     //note_lut instantiation
     priority_encoder encoder(.held_key(held_key), .key(key_idx), .held(held));
@@ -17,7 +21,7 @@ module sound_engine (input clk, input reset, input [1:0] oct, input allowed, inp
     //gating on whether there is a key held. 
     //if held is one, sampe is rom_out, otherwise sample is 16'd0
     //its a 2:1 mux
-    assign sample = held ? rom_out : 16'd0;
+    assign sample = held ? wave_out : 16'd0;
 
     //octve mux
     always @(*) begin
@@ -35,6 +39,26 @@ module sound_engine (input clk, input reset, input [1:0] oct, input allowed, inp
             step = key_step; //need this to prevent quartus from assuming this is a latch
     end
 
+    assign saw = phase[23:8] - 32768; //subtracting recenters it at 0, it flips the top bit
+    assign square = phase[23] ? 32767 : -32767; //if top bit is 1, then max, else min
+    //waveform mux
+    always @(*) begin
+        case (wave_sel): 
+            2'b00
+                //sine
+                wave_out = rom_out;
+            2'b01
+                //square
+                wave_out = square;
+            2'b10
+                //saw
+                wave_out = saw;
+            default
+                wave_out = rom_out;
+                //sine
+        endcase
+    end
+
     reg prev_go;
     always @(posedge clk) begin
         if (reset)
@@ -46,7 +70,6 @@ module sound_engine (input clk, input reset, input [1:0] oct, input allowed, inp
     assign go = allowed & ~prev_go;
 
     //phase register - 24 bits
-    reg [23:0] phase;
     always @(posedge clk) begin
         if (reset) 
             phase <= 24'd0; //24 bit 0

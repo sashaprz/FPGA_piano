@@ -93,7 +93,7 @@ assign right_channel_audio_out = {sample, 16'b0};
  *****************************************************************************/
 
 //instantiate sound_engine here
-sound_engine engine(.clk(CLOCK_50), .reset(reset), .oct(SW[1:0]), .held_key(heldkeys), .allowed(audio_out_allowed), .go(write_audio_out), .sample(sample));
+sound_engine engine(.clk(CLOCK_50), .reset(reset), .oct(SW[1:0]), .held_key(heldkeys), .allowed(audio_out_allowed), .wave_sel(SW[3:2]).go(write_audio_out), .sample(sample));
 project joanne(.CLOCK_50(CLOCK_50), .KEY(KEY), .PS2_CLK(PS2_CLK), .PS2_DAT(PS2_DAT), .HEX0(HEX0), .HEX1(HEX1), .heldkeys(heldkeys));
 
 Audio_Controller Audio_Controller (
