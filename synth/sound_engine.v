@@ -1,29 +1,62 @@
 
-module sound_engine (input clk, input reset, input [1:0] oct, input allowed, output go, output [15:0] sample); 
 
-    //base step: a names constant
-    //24 bits wide, phase width
-    //number that decides the pitch. base step is the step value for the main octacve
-    //before its shifted
-    //full lab is 2^24 = 16777216 phase units. 
+module sound_engine (input clk, input reset, input [1:0] oct, input allowed, input [11:0] held_key, input [1:0] wave_sel, output go, output [15:0] sample); 
     /*
-    261.63 laps/s ÷ 48,828 moves/s = 0.005358 laps per move
-    0.005358 × 16,777,216 units/lap = 89,895 units per move
+    step per key comes from note_lut: step = f × 2²⁴ / 48000.
     */
-    localparam [23:0] BASE_STEP = 24'd89895; //the d means decimal value
     reg [23:0] step; //assigned in an always block
+    wire [3:0] key_idx; //4 bits
+    wire held; // for gate
+    wire [23:0] key_step; 
+    wire [15:0] rom_out;
+    wire [15:0] saw; 
+    wire [15:0] square;
+    reg [15:0] wave_out;
+    reg [23:0] phase;
+
+    //note_lut instantiation
+    priority_encoder encoder(.held_key(held_key), .key(key_idx), .held(held));
+    note_lut note(.sel(key_idx), .out(key_step));
+
+    //gating on whether there is a key held. 
+    //if held is one, sampe is rom_out, otherwise sample is 16'd0
+    //its a 2:1 mux
+    assign sample = held ? wave_out : 16'd0;
 
     //octve mux
     always @(*) begin
         //if both are up, oct[1] wins so octave goes down
+
         if (oct[1]) 
             //oct[1] = down
-            step = BASE_STEP >> 1; 
+            step = key_step >> 1; //this is halving the basestep
+            //you step through the table at half the speed, half the frequency, an octave is a factor of 2 in frequency
         else if (oct[0])
             //oct[0] = up one octave
-            step = BASE_STEP << 1;
+            step = key_step << 1; //doubling frequency is one octave up
+            //means shift every bit left. this is like multiplying by 2
         else    
-            step = BASE_STEP; //need this to prevent quartus from assuming this is a latch
+            step = key_step; //need this to prevent quartus from assuming this is a latch
+    end
+
+    assign saw = phase[23:8] - 32768; //subtracting recenters it at 0, it flips the top bit
+    assign square = phase[23] ? 32767 : -32767; //if top bit is 1, then max, else min
+    //waveform mux
+    always @(*) begin
+        case (wave_sel): 
+            2'b00
+                //sine
+                wave_out = rom_out;
+            2'b01
+                //square
+                wave_out = square;
+            2'b10
+                //saw
+                wave_out = saw;
+            default
+                wave_out = rom_out;
+                //sine
+        endcase
     end
 
     reg prev_go;
@@ -37,7 +70,6 @@ module sound_engine (input clk, input reset, input [1:0] oct, input allowed, out
     assign go = allowed & ~prev_go;
 
     //phase register - 24 bits
-    reg [23:0] phase;
     always @(posedge clk) begin
         if (reset) 
             phase <= 24'd0; //24 bit 0
@@ -46,7 +78,7 @@ module sound_engine (input clk, input reset, input [1:0] oct, input allowed, out
     end
 
     //instantiating sine_rom
-    sine_rom ROM(.clk(clk), .addr(phase[23:16]), .q(sample));
+    sine_rom ROM(.clk(clk), .addr(phase[23:16]), .q(rom_out));
 
 
 endmodule
