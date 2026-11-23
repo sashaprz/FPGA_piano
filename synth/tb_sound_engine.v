@@ -57,9 +57,10 @@ module tb_sound_engine;
     // ---- stimulus: the test itself ----
     initial begin
         //on the real board, oct is wired to SW so we are simulating a switch flip
-        reset = 1; oct = 2'b00; held_key = 12'b0;        // start in reset, middle octave
+        reset = 1; oct = 2'b00; held_key = 12'b0; wave_sel = 2'b00;       // start in reset, middle octave
         repeat(3) @(posedge clk);
         reset = 0;                    // release reset
+        //key select test
         held_key = 12'b0000_0000_0000;   // nothing held -> expect sample = 0
         #2000;
         held_key = 12'b0010_0000_0000;   // A (bit 9) -> expect ~109 samples/period
@@ -68,6 +69,17 @@ module tb_sound_engine;
         #30000;
         held_key = 12'b0000_0000_0000;   // release all -> expect sample = 0
         #2000;
+
+        //wave sel test
+        held_key = 12'b0010_0000_0000;   // hold A
+        wave_sel = 2'b00;                // sine
+        #18000;
+        wave_sel = 2'b01;                // square
+        #18000;
+        wave_sel = 2'b10;                // saw
+        #18000;
+        wave_sel = 2'b11;                // default -> should be sine again
+        #18000;
         $stop;                        // ends sim (Icarus); use $stop in ModelSim
     end
 
