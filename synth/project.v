@@ -10,14 +10,8 @@ module project(CLOCK_50, KEY, PS2_CLK, PS2_DAT, HEX0, HEX1, heldkeys, VGA_R, VGA
     parameter COLOR_DEPTH = 9; // 9 6 3
     parameter nX = (RESOLUTION == "640x480") ? 10 : ((RESOLUTION == "320x240") ? 9 : 8);
     parameter nY = (RESOLUTION == "640x480") ? 9 : ((RESOLUTION == "320x240") ? 8 : 7);
-    output [7:0] VGA_R;
-    output [7:0] VGA_G;
-    output [7:0] VGA_B;
-    output VGA_HS;
-    output VGA_VS;
-    output VGA_BLANK_N;
-    output VGA_SYNC_N;
-    output VGA_CLK; 
+    output [7:0] VGA_R, VGA_G, VGA_B;
+    output VGA_HS, VGA_VS, VGA_BLANK_N, VGA_SYNC_N, VGA_CLK; 
 
     wire resetn = KEY[0];
     wire PS2_CLK_S, PS2_DAT_S; // signals synced to our clock
@@ -61,6 +55,23 @@ module project(CLOCK_50, KEY, PS2_CLK, PS2_DAT, HEX0, HEX1, heldkeys, VGA_R, VGA
     keyboard_reader k1(CLOCK_50, resetn, ps2_byte, ps2_valid, heldkeys, key, validkey);
 
     seg7 s0(heldkeys, HEX0, HEX1, validkey); // TESTING
+
+    wire [7:0] px_x;
+    wire [6:0] px_y;
+    wire [2:0] px_color;
+    wire px_write;
+    
+    draw_piano(CLOCK_50, resetn, held_keys, px_x, px_y, px_color, px_write);
+
+    vga_adapter VGA ( // given by course ... ?? 
+        .resetn(resetn), .clock(CLOCK_50),
+        .color(px_color), .x(px_x), .y(px_y), .write(px_write),
+        .VGA_R(VGA_R), .VGA_G(VGA_G), .VGA_B(VGA_B),
+        .VGA_HS(VGA_HS), .VGA_VS(VGA_VS),
+        .VGA_BLANK_N(VGA_BLANK_N), .VGA_SYNC_N(VGA_SYNC_N), .VGA_CLK(VGA_CLK));
+        defparam VGA.RESOLUTION = "160x120";
+        defparam VGA.COLOR_DEPTH = 3;
+        defparam VGA.BACKGROUND_IMAGE = "./MIF/rainbow_160_3.mif";
 endmodule
 
 module sync(D, resetn, clock, Q);
@@ -129,6 +140,75 @@ module keyboard_reader (clock, resetn, ps2_byte, ps2_valid, held_keys, keys, val
                 f0 <= 1'b1; // warning that next byte will be a release
             else if(valid) // if pressed key is valid
                 held_keys[keys] <= 1'b1; // set the current key to held
+        end
+    end
+endmodule
+
+module draw_piano(clock, resetn, held_keys, VGA_x, VGA_y, VGA_color, VGA_write);
+    input clock, resetn;
+    input [11:0] held_keys;
+    output_reg [7:0] VGA_x; 
+    output reg [6:0] VGA_y;
+    output reg [2:0] VGA_color;
+    output reg VGA_write;
+
+    reg [3:0] n; // which key we're drawing
+    reg [4:0] px; // column inside key
+    reg [6:0] py; // row inside key
+
+    reg [3:0] held; // bit number of key being held
+    reg [7:0] left;
+    reg black; // if flat
+    wire [4:0] width = black ? 5'd12 : 5'd20;
+    wire [6:0] height = black ? 7'd42 : 7'd70;
+
+    always @ (*)
+    begin
+        black = 1'b0;
+        case(n)
+            4'd0: begin held = 4'd0; left = 8'd1;
+            4'd1: begin held = 4'd2;  left = 8'd30;  end
+            4'd2: begin held = 4'd4;  left = 8'd50;  end
+            4'd3: begin held = 4'd5;  left = 8'd70;  end
+            4'd4: begin held = 4'd7;  left = 8'd90;  end
+            4'd5: begin held = 4'd9;  left = 8'd110; end
+            4'd6: begin held = 4'd11; left = 8'd130; end
+            4'd7: begin held = 4'd1;  left = 8'd24;  black = 1'b1; end
+            4'd8: begin held = 4'd3;  left = 8'd44;  black = 1'b1; end
+            4'd9: begin held = 4'd6;  left = 8'd84;  black = 1'b1; end
+            4'd10: begin held = 4'd8;  left = 8'd104; black = 1'b1; end
+            4'd11: begin held = 4'd10; left = 8'd124; black = 1'b1; end
+        endcase
+    end
+
+    wire holding = held_keys[held]; // whether or not the current key that is being drawn is held
+
+    always @ (posedge clock) begin
+        if(!resetn) begin // reset
+            n <= 0;
+            px <= 0;
+            py <= 0;
+            VGA_write <= 1'b0;
+        end else begin
+            VGA_x = left + px;
+            VGA_y = 7'd30 + py;
+            VGA_write <= 1'b1;
+            if(black)
+                VGA_color <= held ? 3'b001 : 3'b000; // black key, blue if held
+            else if(px == w - 1)
+                VGA_color <= 3'b000;  // draw a line in between keys
+            else
+                VGA_color <= held ? 3'b010 : 3'b111; // white key, green if held
+            
+            if(px == w - 1) begin
+                px <= 0; // if at end of row, go back to beginning
+                if(py == h - 1) begin // at the end of the last row
+                    py <= 0;
+                    n <= (n == 4'd11) ? 4'd0 : n + 4'd1; // go to next key, if at last key, wrap back to first
+                end else
+                    py <= py + 1'b1;
+            end else // not at end, just increment once more
+                px <= px + 1'b1;
         end
     end
 endmodule
