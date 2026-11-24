@@ -1,5 +1,9 @@
 db/
 incremental_db/
 output_files/
-given_audio/
-*.bak
+simulation/
+work/
+transcript
+*.wlf
+*.vcd
+*.qws
