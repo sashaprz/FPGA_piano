@@ -1,27 +1,43 @@
-
-
-module sound_engine (input clk, input reset, input [1:0] oct, input allowed, input [11:0] held_key, input [1:0] wave_sel, output go, output [15:0] sample); 
+module sound_engine (input clk, input reset, input [1:0] oct, input allowed, input [11:0] held_key, input [1:0] wave_sel, output write, output reg [15:0] sample); 
     /*
     step per key comes from note_lut: step = f × 2²⁴ / 48000.
     */
     reg [23:0] step; //assigned in an always block
-    wire [3:0] key_idx; //4 bits
-    wire held; // for gate
     wire [23:0] key_step; 
     wire [15:0] rom_out;
     wire [15:0] saw; 
     wire [15:0] square;
     reg [15:0] wave_out;
-    reg [23:0] phase;
 
-    //note_lut instantiation
-    priority_encoder encoder(.held_key(held_key), .key(key_idx), .held(held));
-    note_lut note(.sel(key_idx), .out(key_step));
+    //fsm declarations
+    //5 localparams, the states
+    localparam [2:0] WAIT = 3'd0;
+    localparam [2:0] READ = 3'd1;
+    localparam [2:0] ROM_WAIT = 3'd2;
+    localparam [2:0] ADD = 3'd3;
+    localparam [2:0] OUTPUT = 3'd4;
+    integer i;
+    reg [2:0] state, next_state;
+    reg [3:0] k;
+    //declare 12 registers, each 24 bits
+    reg [23:0] phase [0:11];
+    reg signed [19:0] acc;
+    wire [23:0] cur_phase = phase[k];
+    wire [7:0] rom_address = cur_phase[23:16];
+    wire voice_held = held_key[k];
+    //acc is 20 bits and wave_out is 16 bits. we need to widen before we can add. 
+    wire signed [19:0] wave_ext = {{4{wave_out[15]}}, wave_out};
 
-    //gating on whether there is a key held. 
-    //if held is one, sampe is rom_out, otherwise sample is 16'd0
-    //its a 2:1 mux
-    assign sample = held ? wave_out : 16'd0;
+    note_lut note(.sel(k), .out(key_step));
+ 
+    //clamping sample
+    always @(*) begin
+        if (acc > 20'sd32767) sample = 16'h7FFF;
+        else if (acc < -20'sd32768) sample = 16'h8000;
+        else sample = acc[15:0];
+    end
+
+    assign write = (state == OUTPUT); //when we finally write
 
     //octve mux
     always @(*) begin
@@ -39,46 +55,78 @@ module sound_engine (input clk, input reset, input [1:0] oct, input allowed, inp
             step = key_step; //need this to prevent quartus from assuming this is a latch
     end
 
-    assign saw = phase[23:8] - 32768; //subtracting recenters it at 0, it flips the top bit
-    assign square = phase[23] ? 32767 : -32767; //if top bit is 1, then max, else min
+    assign saw = cur_phase[23:8] - 32768; //subtracting recenters it at 0, it flips the top bit
+    assign square = cur_phase[23] ? 32767 : -32767; //if top bit is 1, then max, else min
     //waveform mux
     always @(*) begin
-        case (wave_sel): 
-            2'b00
+        case (wave_sel) 
+            2'b00:
                 //sine
                 wave_out = rom_out;
-            2'b01
+            2'b01:
                 //square
                 wave_out = square;
-            2'b10
+            2'b10:
                 //saw
                 wave_out = saw;
-            default
+            default:
                 wave_out = rom_out;
                 //sine
         endcase
     end
 
-    reg prev_go;
-    always @(posedge clk) begin
-        if (reset)
-            prev_go <= 1'b0; //equals 0 on reset
-        else
-            prev_go <= go;
-    end
-
-    assign go = allowed & ~prev_go;
-
-    //phase register - 24 bits
-    always @(posedge clk) begin
-        if (reset) 
-            phase <= 24'd0; //24 bit 0
-        else if (go) //jump step table rows
-            phase <= phase + step;
-    end
-
     //instantiating sine_rom
-    sine_rom ROM(.clk(clk), .addr(phase[23:16]), .q(rom_out));
+    sine_rom ROM(.clk(clk), .addr(rom_address), .q(rom_out));
 
+    //FSM -> multiple notes at once
+    //combinational block, where to go next
+    always @(*) begin
+        case (state)
+            WAIT: begin
+                if (allowed) next_state = READ;
+                else next_state = WAIT;
+            end
+            READ: begin
+                next_state = ROM_WAIT; //always
+            end
+            ROM_WAIT: begin
+                next_state = ADD;
+            end
+            ADD: begin
+                if (k < 11) next_state = READ;
+                else next_state = OUTPUT;
+            end
+            OUTPUT: begin
+                next_state = WAIT;
+            end
+            default: next_state = WAIT;
+        endcase
+    end
 
+    //clocked block, what happens on each edge
+    always @(posedge clk) begin
+        if (reset) begin
+            state <= WAIT;
+            k <= 4'd0;
+            acc <= 20'sd0;
+            for (i = 0; i < 12; i = i + 1) phase[i] <= 24'd0;
+        end
+        else begin
+            state <= next_state;
+            case (state)
+                WAIT: begin
+                    acc <= 20'sd0;
+                    k <= 4'd0;
+                end
+                ADD: begin
+                    if (voice_held) begin
+                        acc <= acc + wave_ext;
+                        phase[k] <= phase[k] + step;
+                    end
+                    k <= k + 1; //runs every time
+                end
+                default: ;//read, rom_wait, output - do nothing
+            endcase
+        end
+    end
 endmodule
