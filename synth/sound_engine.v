@@ -25,8 +25,26 @@ module sound_engine (input clk, input reset, input [1:0] oct, input allowed, inp
     wire [23:0] cur_phase = phase[k];
     wire [7:0] rom_address = cur_phase[23:16];
     wire voice_held = held_key[k];
-    //acc is 20 bits and wave_out is 16 bits. we need to widen before we can add. 
-    wire signed [19:0] wave_ext = {{4{wave_out[15]}}, wave_out};
+
+    //fsm declarations for ramping volume up and down on key press and release -> more realistic
+    reg [15:0] volume [11:0];
+    localparam attack_rate = 137;
+    localparam release_rate = 7;
+    //4 localparams, the states
+    localparam [1:0] IDLE = 2'd0;
+    localparam [1:0] ATTACK = 2'd1;
+    localparam [1:0] SUSTAIN = 2'd2;
+    localparam [1:0] RELEASE = 2'd3;
+    reg [1:0] env_state [11:0];
+    reg [1:0] env_next; //each envelope state is 2 bits
+    reg [15:0] vol_next;
+    localparam MAX = 65535; //vmax volume
+    wire voice_active = (env_state[k] != IDLE);
+    //wave value times loudness
+    wire signed [24:0] vol_product = $signed(wave_out) * $signed({1'b0, volume[k][15:8]});
+    //^first is wave_out -where the wave is rn. the seocnd is how loud the voice should be rn - we want the top 8 bits for loudness
+    wire signed [19:0] vol_sample  = vol_product >>> 8; //undo x256
+
 
     note_lut note(.sel(k), .out(key_step));
  
@@ -109,7 +127,11 @@ module sound_engine (input clk, input reset, input [1:0] oct, input allowed, inp
             state <= WAIT;
             k <= 4'd0;
             acc <= 20'sd0;
-            for (i = 0; i < 12; i = i + 1) phase[i] <= 24'd0;
+            for (i = 0; i < 12; i = i + 1) begin
+                phase[i] <= 24'd0;
+                env_state[i] <= IDLE;
+                volume[i] <= 16'd0;
+            end
         end
         else begin
             state <= next_state;
@@ -119,14 +141,55 @@ module sound_engine (input clk, input reset, input [1:0] oct, input allowed, inp
                     k <= 4'd0;
                 end
                 ADD: begin
-                    if (voice_held) begin
-                        acc <= acc + wave_ext;
+                    if (voice_active) begin
+                        acc <= acc + vol_sample;
                         phase[k] <= phase[k] + step;
                     end
                     k <= k + 1; //runs every time
+                    //for volume envelope
+                    env_state[k] <= env_next;
+                    volume[k] <= vol_next;
                 end
                 default: ;//read, rom_wait, output - do nothing
             endcase
         end
+    end
+
+    //computes volume to make the notes fade in and out
+    always @ (*) begin
+        env_next = env_state[k]; 
+        vol_next = volume[k];
+        //each branch starts as unchanged and overrides only when it needs to
+        
+        case (env_state[k])
+            //defaults to prevent latch
+            IDLE: 
+                if (voice_held) env_next = ATTACK;
+                else env_next = IDLE;
+            ATTACK: 
+                if (voice_held && (volume[k] > MAX - attack_rate)) begin
+                    env_next = SUSTAIN;
+                    vol_next = MAX;
+                end
+                else if (voice_held) begin
+                    env_next = ATTACK;
+                    vol_next = volume[k] + attack_rate;
+                end
+                else env_next = RELEASE;
+            SUSTAIN: 
+                if (voice_held) env_next = SUSTAIN;
+                else env_next = RELEASE;
+            RELEASE: 
+                if (voice_held) env_next = ATTACK;
+                else if (volume[k] < release_rate) begin
+                    env_next = IDLE;
+                    vol_next = 0;
+                end
+                else begin
+                    env_next = RELEASE;
+                    vol_next = volume[k] - release_rate;
+                end
+            default: ;
+        endcase
     end
 endmodule
