@@ -64,14 +64,14 @@ module tb_sound_engine;
         #1000000;
         held_key = 12'b0000_0000_0000; //nothing held
         #2000000;
-        held_key = 12'b0010_0000_0000;   // A (bit 9) -> ~87 us period
+        held_key = 12'b0010_0000_0000;   //retrigger mid-release: should ramp up from current volume
         #1000000;
         held_key = 12'b0000_0000_0000; //nothing held
         #8000000;
         held_key = 12'b0000_0000_0001;   // C alone
         #500000;
         held_key = 12'b0000_0001_0001; // C + E
-        #10000000;
+        #1000000;
         held_key = 12'b0000_0001_0000; //E only
         #1000000; 
 
@@ -88,7 +88,7 @@ module tb_sound_engine;
         // ---- clamp test: 4-note chord on square overflows 16 bits ----
         held_key = 12'b0000_1001_0001;   // C, E, G (+ ... ) -> heard flattens at 32767 / -32768
         wave_sel = 2'b01;
-        #10000000;
+        #1000000;
 
         $stop;
     end
