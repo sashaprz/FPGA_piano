@@ -1,10 +1,10 @@
-module project(CLOCK_50, KEY, PS2_CLK, PS2_DAT, HEX0, HEX1, heldkeys, VGA_R, VGA_G, VGA_B,
+module project(CLOCK_50, KEY, PS2_CLK, PS2_DAT, HEX0, HEX1, VGA_R, VGA_G, VGA_B,
                 VGA_HS, VGA_VS, VGA_BLANK_N, VGA_SYNC_N, VGA_CLK);
     input CLOCK_50;
     input [3:0] KEY;
     inout PS2_CLK, PS2_DAT;
     output [6:0] HEX0, HEX1;
-    output [11:0] heldkeys;
+    wire [11:0] heldkeys;
 
     parameter RESOLUTION = "640x480"; // "640x480" "320x240" "160x120"
     parameter COLOR_DEPTH = 9; // 9 6 3
@@ -58,10 +58,10 @@ module project(CLOCK_50, KEY, PS2_CLK, PS2_DAT, HEX0, HEX1, heldkeys, VGA_R, VGA
 
     wire [7:0] px_x;
     wire [6:0] px_y;
-    wire [2:0] px_color;
+    wire [8:0] px_color;
     wire px_write;
     
-    draw_piano(CLOCK_50, resetn, held_keys, px_x, px_y, px_color, px_write);
+    draw_piano dp(CLOCK_50, resetn, heldkeys, px_x, px_y, px_color, px_write);
 
     vga_adapter VGA ( // given by course ... ?? 
         .resetn(resetn), .clock(CLOCK_50),
@@ -70,7 +70,7 @@ module project(CLOCK_50, KEY, PS2_CLK, PS2_DAT, HEX0, HEX1, heldkeys, VGA_R, VGA
         .VGA_HS(VGA_HS), .VGA_VS(VGA_VS),
         .VGA_BLANK_N(VGA_BLANK_N), .VGA_SYNC_N(VGA_SYNC_N), .VGA_CLK(VGA_CLK));
         defparam VGA.RESOLUTION = "160x120";
-        defparam VGA.COLOR_DEPTH = 3;
+        defparam VGA.COLOR_DEPTH = 9;
         defparam VGA.BACKGROUND_IMAGE = "./MIF/rainbow_160_3.mif";
 endmodule
 
@@ -147,10 +147,14 @@ endmodule
 module draw_piano(clock, resetn, held_keys, VGA_x, VGA_y, VGA_color, VGA_write);
     input clock, resetn;
     input [11:0] held_keys;
-    output_reg [7:0] VGA_x; 
+    output reg [7:0] VGA_x; 
     output reg [6:0] VGA_y;
-    output reg [2:0] VGA_color;
+    output reg [8:0] VGA_color;
     output reg VGA_write;
+
+    reg bg;      // 0 = painting gray background, 1 = drawing piano
+    reg [7:0] bx;    
+    reg [6:0] by;     
 
     reg [3:0] n; // which key we're drawing
     reg [4:0] px; // column inside key
@@ -166,7 +170,7 @@ module draw_piano(clock, resetn, held_keys, VGA_x, VGA_y, VGA_color, VGA_write);
     begin
         black = 1'b0;
         case(n)
-            4'd0: begin held = 4'd0; left = 8'd1;
+            4'd0: begin held = 4'd0; left = 8'd10; end
             4'd1: begin held = 4'd2;  left = 8'd30;  end
             4'd2: begin held = 4'd4;  left = 8'd50;  end
             4'd3: begin held = 4'd5;  left = 8'd70;  end
@@ -178,31 +182,50 @@ module draw_piano(clock, resetn, held_keys, VGA_x, VGA_y, VGA_color, VGA_write);
             4'd9: begin held = 4'd6;  left = 8'd84;  black = 1'b1; end
             4'd10: begin held = 4'd8;  left = 8'd104; black = 1'b1; end
             4'd11: begin held = 4'd10; left = 8'd124; black = 1'b1; end
+            default: begin held = 4'd0; left = 8'd0; end
         endcase
     end
 
     wire holding = held_keys[held]; // whether or not the current key that is being drawn is held
+    wire black_right = (n == 0) || (n == 1) || (n == 3) || (n == 4) || (n == 5);
+    wire black_left  = (n == 1) || (n == 2) || (n == 4) || (n == 5) || (n == 6);
+
+    wire nodrawwhite = !black && (py < 7'd42) && ((black_left && px <= 5'd5) || (black_right && px >= 5'd14));
 
     always @ (posedge clock) begin
         if(!resetn) begin // reset
             n <= 0;
             px <= 0;
             py <= 0;
+            bx <= 0; 
+            by <= 0;
+            bg <= 1'b0;
             VGA_write <= 1'b0;
-        end else begin
-            VGA_x = left + px;
-            VGA_y = 7'd30 + py;
+        end else if(~bg) begin
+            VGA_x <= bx;
+            VGA_y <= by;
+            VGA_color <= 9'b100_100_100;   
             VGA_write <= 1'b1;
+            if (bx == 8'd159) begin
+                bx <= 0;
+                if (by == 7'd119) bg <= 1'b1;
+                else by <= by + 1'b1;
+            end else
+                bx <= bx + 1'b1;
+        end else begin
+            VGA_x <= left + px;
+            VGA_y <= 7'd30 + py;
+            VGA_write <= !nodrawwhite;
             if(black)
-                VGA_color <= held ? 3'b001 : 3'b000; // black key, blue if held
-            else if(px == w - 1)
-                VGA_color <= 3'b000;  // draw a line in between keys
-            else
-                VGA_color <= held ? 3'b010 : 3'b111; // white key, green if held
+                VGA_color <= holding ? 9'b000_000_111 : 9'b000_000_000; // black key, blue if held
+            else if(px == width - 1)
+                VGA_color <= 9'b000_000_000;  // draw a line in between keys
+            else 
+                VGA_color <= holding ? 9'b000_111_000 : 9'b111_111_111; // white key, green if held
             
-            if(px == w - 1) begin
+            if(px == width - 1) begin
                 px <= 0; // if at end of row, go back to beginning
-                if(py == h - 1) begin // at the end of the last row
+                if(py == height - 1) begin // at the end of the last row
                     py <= 0;
                     n <= (n == 4'd11) ? 4'd0 : n + 4'd1; // go to next key, if at last key, wrap back to first
                 end else
