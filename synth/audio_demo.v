@@ -23,7 +23,10 @@ module audio_demo (
 	AUD_DACDAT,
 
 	FPGA_I2C_SCLK,
-	SW
+	SW, 
+		SW,
+	VGA_R, VGA_G, VGA_B,
+	VGA_HS, VGA_VS, VGA_BLANK_N, VGA_SYNC_N, VGA_CLK
 );
 
 /*****************************************************************************
@@ -52,6 +55,8 @@ output				AUD_DACDAT;
 output				FPGA_I2C_SCLK;
 output 				[6:0] HEX0;
 output 				[6:0] HEX1;
+output 				[7:0] VGA_R, VGA_G, VGA_B;
+output 				VGA_HS, VGA_VS, VGA_BLANK_N, VGA_SYNC_N, VGA_CLK;
 
 /*****************************************************************************
  *                 Internal Wires and Registers Declarations                 *
@@ -90,7 +95,9 @@ assign right_channel_audio_out = {sample, 16'b0};
 
 //instantiate sound_engine here
 sound_engine engine(.clk(CLOCK_50), .reset(reset), .oct(SW[1:0]), .held_key(heldkeys), .allowed(audio_out_allowed), .wave_sel(SW[3:2]), .write(write_audio_out), .sample(sample));
-project joanne(.CLOCK_50(CLOCK_50), .KEY(KEY), .PS2_CLK(PS2_CLK), .PS2_DAT(PS2_DAT), .HEX0(HEX0), .HEX1(HEX1), .heldkeys(heldkeys));
+project joanne(.CLOCK_50(CLOCK_50), .KEY(KEY), .PS2_CLK(PS2_CLK), .PS2_DAT(PS2_DAT), .HEX0(HEX0), .HEX1(HEX1), .heldkeys(heldkeys),
+	.VGA_R(VGA_R), .VGA_G(VGA_G), .VGA_B(VGA_B), .VGA_HS(VGA_HS), .VGA_VS(VGA_VS),
+	.VGA_BLANK_N(VGA_BLANK_N), .VGA_SYNC_N(VGA_SYNC_N), .VGA_CLK(VGA_CLK));
 
 Audio_Controller Audio_Controller (
 	// Inputs
