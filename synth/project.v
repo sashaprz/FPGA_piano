@@ -64,11 +64,20 @@ module project(CLOCK_50, KEY, PS2_CLK, PS2_DAT, HEX0, HEX1, VGA_R, VGA_G, VGA_B,
     draw_piano dp(CLOCK_50, resetn, heldkeys, px_x, px_y, px_color, px_write);
 
     vga_adapter VGA ( // given by course ... ?? 
-        .resetn(resetn), .clock(CLOCK_50),
-        .color(px_color), .x(px_x), .y(px_y), .write(px_write),
-        .VGA_R(VGA_R), .VGA_G(VGA_G), .VGA_B(VGA_B),
-        .VGA_HS(VGA_HS), .VGA_VS(VGA_VS),
-        .VGA_BLANK_N(VGA_BLANK_N), .VGA_SYNC_N(VGA_SYNC_N), .VGA_CLK(VGA_CLK));
+        .resetn(resetn), 
+        .clock(CLOCK_50),
+        .color(px_color), 
+        .x(px_x), 
+        .y(px_y), 
+        .write(px_write),
+        .VGA_R(VGA_R), 
+        .VGA_G(VGA_G), 
+        .VGA_B(VGA_B),
+        .VGA_HS(VGA_HS), 
+        .VGA_VS(VGA_VS),
+        .VGA_BLANK_N(VGA_BLANK_N), 
+        .VGA_SYNC_N(VGA_SYNC_N), 
+        .VGA_CLK(VGA_CLK));
         defparam VGA.RESOLUTION = "160x120";
         defparam VGA.COLOR_DEPTH = 9;
         defparam VGA.BACKGROUND_IMAGE = "./MIF/rainbow_160_3.mif";
